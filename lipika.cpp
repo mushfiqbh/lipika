@@ -77,7 +77,9 @@ class Lexer {
     size_t pos = 0;
     int line = 1, column = 1;
 
+    // Returns the current character without advancing the input position.
     char peek() const { return pos < source.size() ? source[pos] : '\0'; }
+    // Consumes and returns the current character while updating the location.
     char advance() {
         char c = peek();
         if (c == '\0') return c;
@@ -86,6 +88,7 @@ class Lexer {
         return c;
     }
 
+    // Returns the byte length of a UTF-8 character at the given offset.
     int utf8Len(size_t offset) const {
         unsigned char c = source[offset];
         if (c >= 0xC2 && c <= 0xDF) return offset + 1 < source.size() ? 2 : 0;
@@ -95,8 +98,10 @@ class Lexer {
     }
 
 public:
+    // Initializes the lexer with source code text.
     explicit Lexer(std::string s) : source(std::move(s)) {}
 
+    // Converts source code into a sequence of tokens.
     std::vector<Token> tokenize() {
         std::vector<Token> out;
         static const std::unordered_map<std::string, TokenType> keywords = {
@@ -178,22 +183,31 @@ class Parser {
     size_t current = 0;
     std::vector<std::string> errors_;
 
+    // Returns the current token without advancing the parser.
     const Token& peek() const { return tokens[current]; }
+    // Returns the most recently consumed token.
     const Token& previous() const { return tokens[current == 0 ? 0 : current - 1]; }
+    // Checks whether the current token has the requested type.
     bool check(TokenType t) const { return !isAtEnd() && peek().type == t; }
+    // Checks whether parsing has reached the end of the token stream.
     bool isAtEnd() const { return peek().type == TokenType::EndOfFile; }
+    // Consumes and returns the current token when possible.
     const Token& advance() { if (!isAtEnd()) current++; return previous(); }
+    // Consumes a token if it matches the requested type.
     bool match(TokenType t) { if (check(t)) { advance(); return true; } return false; }
 
+    // Records a syntax error at the current token location.
     void error(const std::string& msg) {
         errors_.push_back("Syntax Error at line " + std::to_string(peek().line) + ": " + msg);
     }
 
+    // Requires and consumes a token of the specified type.
     void consume(TokenType type, const std::string& msg) {
         if (check(type)) advance();
         else { error(msg); throw std::runtime_error(msg); }
     }
 
+    // Skips tokens until a likely statement boundary is found.
     void synchronize() {
         while (!isAtEnd()) {
             if (previous().type == TokenType::Semicolon) return;
@@ -205,6 +219,7 @@ class Parser {
         }
     }
 
+    // Parses a number, variable, or parenthesized expression.
     ExprPtr primary() {
         if (match(TokenType::Number)) return std::make_unique<Expr>(NumberExpr{previous().lexeme});
         if (match(TokenType::Identifier)) return std::make_unique<Expr>(VariableExpr{previous().lexeme});
@@ -217,6 +232,7 @@ class Parser {
         throw std::runtime_error("expression");
     }
 
+    // Parses a left-associative sequence of binary operations.
     ExprPtr binary(auto nextLevel, std::initializer_list<TokenType> types) {
         auto e = (this->*nextLevel)();
         while (true) {
@@ -236,12 +252,18 @@ class Parser {
         return e;
     }
 
+    // Parses multiplication, division, and remainder expressions.
     ExprPtr factor() { return binary(&Parser::primary, {TokenType::Star, TokenType::Slash, TokenType::Percent}); }
+    // Parses addition and subtraction expressions.
     ExprPtr term() { return binary(&Parser::factor, {TokenType::Plus, TokenType::Minus}); }
+    // Parses relational comparison expressions.
     ExprPtr comparison() { return binary(&Parser::term, {TokenType::Less, TokenType::Greater, TokenType::LessEqual, TokenType::GreaterEqual}); }
+    // Parses equality comparison expressions.
     ExprPtr equality() { return binary(&Parser::comparison, {TokenType::Equal, TokenType::NotEqual}); }
+    // Parses a complete expression.
     ExprPtr expression() { return equality(); }
 
+    // Parses a braced block of statements.
     BlockStmt block() {
         consume(TokenType::LeftBrace, "Expected '{'.");
         BlockStmt b;
@@ -253,6 +275,7 @@ class Parser {
         return b;
     }
 
+    // Parses one declaration, assignment, control-flow, or print statement.
     StmtPtr statement() {
         if (check(TokenType::IntegerType) || check(TokenType::FloatType)) {
             ValueType type = match(TokenType::IntegerType) ? ValueType::Integer : ValueType::Float;
@@ -295,8 +318,10 @@ class Parser {
     }
 
 public:
+    // Initializes the parser with a token sequence.
     explicit Parser(const std::vector<Token>& t) : tokens(t) {}
 
+    // Parses all top-level statements into a program.
     Program parse() {
         Program p;
         while (!isAtEnd()) {
@@ -306,6 +331,7 @@ public:
         return p;
     }
 
+    // Returns all syntax errors collected during parsing.
     const std::vector<std::string>& errors() const { return errors_; }
 };
 
@@ -317,6 +343,7 @@ class SemanticAnalyzer {
     std::unordered_map<std::string, ValueType> symbols;
     std::vector<std::string> errors_;
 
+    // Determines an expression's type and reports undeclared variables.
     ValueType expressionType(const Expr* expr) {
         if (!expr) return ValueType::Unknown;
         return std::visit(overloaded{
@@ -339,6 +366,7 @@ class SemanticAnalyzer {
         }, expr->node);
     }
 
+    // Checks one statement for declaration and type errors.
     void statement(const Stmt* stmt) {
         if (!stmt) return;
         std::visit(overloaded{
@@ -371,11 +399,13 @@ class SemanticAnalyzer {
     }
 
 public:
+    // Validates all statements in a parsed program.
     bool analyze(const Program& program) {
         symbols.clear(); errors_.clear();
         for (const auto& s : program.statements) statement(s.get());
         return errors_.empty();
     }
+    // Returns all semantic errors collected during analysis.
     const std::vector<std::string>& errors() const { return errors_; }
 };
 
@@ -387,8 +417,10 @@ class PythonCodeGenerator {
     std::ostringstream out;
     int indent = 0;
 
+    // Writes one indented line of generated Python code.
     void line(const std::string& text) { out << std::string(indent * 4, ' ') << text << "\n"; }
 
+    // Converts an expression node into Python source text.
     std::string expr(const Expr* e) {
         if (!e) return "0";
         return std::visit(overloaded{
@@ -398,11 +430,13 @@ class PythonCodeGenerator {
         }, e->node);
     }
 
+    // Generates Python code for every statement in a block.
     void block(const BlockStmt& b) {
         if (b.statements.empty()) { line("pass"); return; }
         for (const auto& s : b.statements) stmt(s.get());
     }
 
+    // Generates Python code for one statement.
     void stmt(const Stmt* s) {
         if (!s) return;
         std::visit(overloaded{
@@ -425,6 +459,7 @@ class PythonCodeGenerator {
     }
 
 public:
+    // Generates Python source code for the complete program.
     std::string generate(const Program& program) {
         out.str(""); out.clear(); indent = 0;
         for (const auto& s : program.statements) stmt(s.get());
@@ -436,6 +471,7 @@ public:
 // MAIN COMPILER DRIVER
 // =============================================================================
 
+// Compiles a Lipika source file into Python code.
 int main(int argc, char** argv) {
     if (argc != 2) {
         std::cerr << "Usage: ./lipika <source.lipi>\n";

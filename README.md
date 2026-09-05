@@ -16,7 +16,5 @@ Current starter features:
 - Basic syntax error recovery
 - Python target generation
 
-Build directly with g++:
-g++ -std=c++17 src/*.cpp -o lipika
-lipika examples/demo.lipi
-python output.py
+Build with lipika compiler:
+> lpk hello.lipi
