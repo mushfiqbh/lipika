@@ -17,4 +17,6 @@ Current starter features:
 - Python target generation
 
 Build with lipika compiler:
-> lpk hello.lipi
+> lpk code/demo.lipi
+> lpk code/error.lipi
+> lpk code/math.lipi

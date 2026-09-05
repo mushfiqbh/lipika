@@ -183,17 +183,11 @@ class Parser {
     size_t current = 0;
     std::vector<std::string> errors_;
 
-    // Returns the current token without advancing the parser.
     const Token& peek() const { return tokens[current]; }
-    // Returns the most recently consumed token.
     const Token& previous() const { return tokens[current == 0 ? 0 : current - 1]; }
-    // Checks whether the current token has the requested type.
     bool check(TokenType t) const { return !isAtEnd() && peek().type == t; }
-    // Checks whether parsing has reached the end of the token stream.
     bool isAtEnd() const { return peek().type == TokenType::EndOfFile; }
-    // Consumes and returns the current token when possible.
     const Token& advance() { if (!isAtEnd()) current++; return previous(); }
-    // Consumes a token if it matches the requested type.
     bool match(TokenType t) { if (check(t)) { advance(); return true; } return false; }
 
     // Records a syntax error at the current token location.
@@ -252,15 +246,10 @@ class Parser {
         return e;
     }
 
-    // Parses multiplication, division, and remainder expressions.
     ExprPtr factor() { return binary(&Parser::primary, {TokenType::Star, TokenType::Slash, TokenType::Percent}); }
-    // Parses addition and subtraction expressions.
     ExprPtr term() { return binary(&Parser::factor, {TokenType::Plus, TokenType::Minus}); }
-    // Parses relational comparison expressions.
     ExprPtr comparison() { return binary(&Parser::term, {TokenType::Less, TokenType::Greater, TokenType::LessEqual, TokenType::GreaterEqual}); }
-    // Parses equality comparison expressions.
     ExprPtr equality() { return binary(&Parser::comparison, {TokenType::Equal, TokenType::NotEqual}); }
-    // Parses a complete expression.
     ExprPtr expression() { return equality(); }
 
     // Parses a braced block of statements.
